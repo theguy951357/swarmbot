@@ -2,118 +2,91 @@
 // Created by cblah on 3/4/2022.
 //
 
-#include "../../includes/Player.h"
-//player class will loop the game instead of the Game itself.
+#include "../includes/Player.h"
+#include "../includes/Utils.h"
+#include <iostream>
 
-/**
- * The player will start the game.
- * In this constructor, the player will take in a game as a parameter,
- * determine what color each player has chosen, and then
- * get the legal moves to be played while there is still
- * a next move to be played (not game over)
- * @param game
- */
+namespace Othello {
 
-Player::Player(OthelloGame *game) : game(game) {
-
-    this->moves = new MoveSet();
-    game->isAgentBlack() ? this->color = -1: this->color = 1;
-    this->color == BLACK ? this->playerColor = 'B':this->playerColor = 'W';
+Player::Player(std::shared_ptr<OthelloGame> game)
+    : legalBoard(BitMask::EMPTY_BOARD),
+      color(Player::WHITE),
+      game(game),
+      moves(std::make_shared<MoveSet>()) {
+    
+    // Set player color opposite to agent
+    color = game->isAgentBlack() ? Player::WHITE : Player::BLACK;
 }
 
-/**
- * This method will get a set of legal moves for the current player
- * It will get the current bitboard from the game containing the current
- * set of legal moves.
- * Then it will go through that board and fill a vector
- * with pointers to those moves on the MoveSet.
- */
+void Player::makeMove() {
+    if (game->getCurrentPlayer() != color) {
+        return;  // Not this player's turn
+    }
+    
+    getLegalMoves();
+    game->getBoard()->printBoardWithLegalMoves();
+    
+    std::cout << "Your move (format: 'B c 4' or 'W d 3'): ";
+    std::string input;
+    std::getline(std::cin, input);
+    
+    if (game->interpretInput(input)) {
+        addToStrategy();
+    }
+}
 
 void Player::getLegalMoves() {
-    this->legalMoves.clear();
-    this->legalBoard = this->game->getBoard()->getLegals();
-    for (int i = 7; i >= 0 ; --i) {
-        for (int j = 7; j >= 0 ; --j) {
-            if (this->legalBoard & (1ULL << (8* i + j))){
-                //cout<<"C debug number "<<64-(8*i+j)<<endl;
-                this->legalMoves.push_back(this->moves->getMove(63-(8*i+j)));
-            }
-        }
+    legalMoves.clear();
+    legalBoard = game->getBoard()->getLegals();
+    
+    // Use bit manipulation to find legal moves
+    uint64_t board = legalBoard;
+    while (board != 0) {
+        int pos = __builtin_ctzll(board);
+        int correctedPos = 63 - pos;
+        legalMoves.push_back(moves->getMovePtr(correctedPos));
+        board &= board - 1;
     }
-    printMoves();
 }
-/**
- * Prints out the vector of current legal moves that can be played by the current player
- */
-void Player::printMoves() {
-    cout<<"C legal moves for ";
-    Utils::printPlayerColor(this->game->getCurrentPlayer());
-    cout<<": ";
-    for (it = legalMoves.begin(); it!=legalMoves.end(); ++it) {
-        Move *temp = *it;
-        temp->printMove();
-        if (it != legalMoves.end()-1){
-            cout<<", ";
-        }
-    }
-    cout<<endl;
-}
-/**
- * this is a method to print the strategy of the current player.
- * in the Player class, this would be the opponent.
- */
-void Player::printStrategy() {
-    if (this->strategy.empty()){
-        return;
-    }
-    cout<<"C "<<this->playerColor<<" moves played: ";
-    printStrategyHelper();
-    cout<<endl;
-}
-/**
- * recursive helper method for printing the strategy stack
- */
-void Player::printStrategyHelper() {
-    if (this->strategy.empty()){
-        return;
-    }
-    Move *x = this->strategy.top();
-    this->strategy.pop();
-    printStrategyHelper();
-    x->printMove();
-    cout<<", ";
-    this->strategy.push(x);
 
-}
-/**
- * This is the initial method for the player to make a move.
- * it will get the list of legal moves, wait for input from the user
- * or the referee passing along the other agent, then it will add that move
- * to the strategy stack.
- */
-void Player::makeMove() {
-    getLegalMoves();
-    game->interpretInput();
-    addToStrategy();
-}
-/**
- * This method will add a pointer to a move in a stack
- * this will dictate all the moves that player has made.
- * when the swarm agents start, these stacks will be in a
- * genetic algorithm that will dictate the behavior of
- * each swarm agent.
- */
 void Player::addToStrategy() {
-    short temp = this->game->getLastMovePlayed();
-    if (temp!=-1 && this->game->getCurrentPlayer()!=this->color){
-        if (this->game->isMoveMade()){
-            this->strategy.push(this->moves->getMove(63-temp));
-        }
-        printStrategy();
+    int16_t lastMove = game->getLastMove();
+    
+    if (lastMove != Position::NO_MOVE_MADE_YET && game->isMoveMade()) {
+        strategy.push(moves->getMovePtr(63 - lastMove));
     }
 }
 
-short Player::getColor() const {
-    return color;
+void Player::printMoves() const {
+    std::cout << "Legal moves: ";
+    for (const auto& move : legalMoves) {
+        std::cout << move->getCol() << move->getRow() << " ";
+    }
+    std::cout << std::endl;
 }
 
+void Player::printStrategy() const {
+    if (strategy.empty()) {
+        std::cout << "No moves in strategy yet." << std::endl;
+        return;
+    }
+    
+    std::cout << "Move history: ";
+    
+    // Copy stack to print without modifying
+    std::stack<std::shared_ptr<Move>> tempStack = strategy;
+    std::vector<std::shared_ptr<Move>> moves;
+    
+    while (!tempStack.empty()) {
+        moves.push_back(tempStack.top());
+        tempStack.pop();
+    }
+    
+    // Print in chronological order
+    for (auto it = moves.rbegin(); it != moves.rend(); ++it) {
+        std::cout << (*it)->getCol() << (*it)->getRow() << " ";
+    }
+    std::cout << std::endl;
+}
+
+} // namespace Othello

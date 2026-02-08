@@ -2,30 +2,40 @@
 // Created by cblah on 3/4/2022.
 //
 
-#ifndef SWARMBOT_MOVE_H
-#define SWARMBOT_MOVE_H
+#pragma once
 
-#include <iostream>
+#include <cstdint>
 
-using namespace std;
+namespace Othello {
+
+/**
+ * Represents a single move in Othello
+ */
 class Move {
-
 public:
     Move();
-
-    Move(char col, short row);
-
-    char getCol() const;
-
-    short getRow() const;
-
-    void printMove();
+    Move(char col, int16_t row);
+    
+    // Getters
+    char getCol() const { return col; }
+    int16_t getRow() const { return row; }
+    
+    // Setters
+    void setCol(char c) { col = c; }
+    void setRow(int16_t r) { row = r; }
+    
+    // Comparison operators
+    bool operator==(const Move& other) const {
+        return col == other.col && row == other.row;
+    }
+    
+    bool operator!=(const Move& other) const {
+        return !(*this == other);
+    }
 
 private:
-    string name = "C Move.cpp";
     char col;
-    short row;
+    int16_t row;
 };
 
-
-#endif //SWARMBOT_MOVE_H
+} // namespace Othello

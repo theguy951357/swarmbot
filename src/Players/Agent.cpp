@@ -3,247 +3,258 @@
 //
 
 
-#include "../../includes/Agent.h"
+#include "../includes/Agent.h"
+#include "../includes/AntColonySwarm.h"
+#include "../includes/Evaluate.h"
+#include "../includes/Utils.h"
+#include <omp.h>
+#include <iostream>
+#include <fstream>
+#include <numeric>
 
+namespace Othello {
 
-/**
- * The constructor will inherit from the Player class.
- * The only difference is that if the game determines
- * that the agent is playing black, then it will set its own color to black
- * instead of the Player class setting its color to the opposite.
- * @param game
- */
-Agent::Agent(OthelloGame *game, GameTree *gameTree) : Player(game), gameTree(gameTree) {
-    game->isAgentBlack()? this->color = 1 : this->color = -1;
-    this->color == BLACK ? this->playerColor = 'B':this->playerColor = 'W';
-    cout<<name<<" Agent made"<<endl;
-    for (int i = 0; i < MAX_SWARM_SIZE; ++i) {
-        auto *swarm1 = new AntColonySwarm(gameTree);
-        acswarm.emplace(acswarm.end(),*swarm1);
-    }
-    cout<<name<<" swarm made with "<<acswarm.size()<<" agents"<<endl;
-    this->bookmark = gameTree->getRoot();
-    this->treeCounter=0;
-
+Agent::Agent(std::shared_ptr<OthelloGame> game,
+             std::shared_ptr<GameTree> gameTree)
+    : Player(game),
+      gameTree(gameTree),
+      bookmark(gameTree->getRoot()),
+      treeCounter(0) {
+    
+    // Set agent color
+    color = game->isAgentBlack() ? Player::BLACK : Player::WHITE;
+    
+    std::cout << "Agent created as ";
+    Utils::printPlayerColor(color);
+    std::cout << std::endl;
+    
+    // Initialize swarm agents
+    initializeSwarms();
+    
+    std::cout << "Swarm initialized with " << swarms.size() 
+              << " agents" << std::endl;
 }
-/**
- * This will begin the agents thinking process for each move.
- *
- */
+
+void Agent::initializeSwarms() {
+    int swarmSize = SwarmConfig::getMaxSwarmSize();
+    swarms.reserve(swarmSize);
+    
+    // Create swarm agents (using AntColonySwarm as default)
+    for (int i = 0; i < swarmSize; ++i) {
+        swarms.push_back(std::make_unique<AntColonySwarm>(gameTree));
+    }
+}
+
+void Agent::makeMove() {
+    decide();
+}
+
 void Agent::decide() {
-
-
-
+    // Move bookmark to opponent's last move
     moveBookmark();
-
-    if (this->bookmark->getState()!= SCANNED){
-        gameTree->scanNode(this->bookmark);
+    
+    // Scan current node if needed
+    if (bookmark->getState() != ScanState::SCANNED) {
+        gameTree->scanNode(bookmark);
     }
-
-    if (this->game->getCurrentPlayer()==this->color) {
-        getLegalMoves();
-        this->bookmark->getCurrentBoard()->printBoardWithLegalMoves();
-
-        GameTreeNode *children = this->bookmark->getChild();
-        while(children != nullptr){
-            monteCarloParallel(children);
-            //gameTree->printGametree(gameTree->getRoot());
-
-            children = children->getSibling();
-        }
-
-        if (!this->legalMoves.empty()){
-            Move temp = analyze()->getLocation();
-            this->game->getBoard()->playPiece(this->color, temp.getCol(), temp.getRow(),false);
-            this->game->setLastMovePlayed(Utils::convertToGrid(temp.getCol(),temp.getRow()));
-            //cout << this->playerColor << " " << temp->getCol() << " " << temp->getRow() << endl;
-        }else{
-            this->game->getBoard()->playPiece(this->color, 'e', 5,false);
-            this->game->setLastMovePlayed(PASS);
-            this->bookmark = this->bookmark->getChild();
-        }
-        agentAddToStrategy();
-        cout<<this->name<<" Agent plays ";
-        Utils::printGridLocation(this->game->getLastMovePlayed());
-        //cout<<endl;
-        this->game->switchPlayer();
+    
+    if (game->getCurrentPlayer() != color) {
+        return;  // Not agent's turn
     }
-}
-/**
- * The agent needs a different addToStrategy method, because the player's addToStrategy()
- * method needs to check if a move was made due to human error.
- * since the agent doesn't activate that check because it doesn't
- * use the interpretInput() method that alters that bool.
- * That check gets bypassed and thinks a move was not made.
- */
-void Agent::agentAddToStrategy() {
-    short temp = this->game->getLastMovePlayed();
-    if (temp!=-1 && this->game->getCurrentPlayer()==this->color){
-        this->strategy.push(this->moves->getMove(63-temp));
-        printStrategy();
+    
+    getLegalMoves();
+    bookmark->getBoard()->printBoardWithLegalMoves();
+    
+    // Run simulations on all children
+    auto children = bookmark->getChild();
+    while (children) {
+        monteCarloParallel(children);
+        children = children->getSibling();
     }
+    
+    // Select best move
+    if (!legalMoves.empty()) {
+        auto bestNode = analyze();
+        const Move& bestMove = bestNode->getLocation();
+        
+        game->getBoard()->playPiece(color, bestMove.getCol(), 
+                                    bestMove.getRow(), false);
+        game->setLastMove(Utils::convertToGrid(bestMove.getCol(), 
+                                               bestMove.getRow()));
+    } else {
+        // Pass move
+        game->getBoard()->playPiece(color, 'e', 5, false);
+        game->setLastMove(Position::PASS);
+        bookmark = bookmark->getChild();
+    }
+    
+    std::cout << "Agent plays ";
+    Utils::printGridLocation(game->getLastMove());
+    std::cout << std::endl;
+    
+    game->switchPlayer();
+    addToStrategy();
 }
 
 void Agent::moveBookmark() {
-
-    if (this->game->getLastMovePlayed() == NO_MOVE_MADE_YET){
-        cout<<this->name<<" no move has been made yet. bookmark not moved"<<endl;
+    int16_t lastMove = game->getLastMove();
+    
+    if (lastMove == Position::NO_MOVE_MADE_YET) {
+        std::cout << "No move made yet, bookmark not moved." << std::endl;
         return;
     }
-    cout<<name<<" Bookmark is at "<<this->bookmark->getLocation().getCol()<<this->bookmark->getLocation().getRow()<<endl;
-    this->bookmark->getCurrentBoard()->printBoardWithLegalMoves();
-    short location = this->game->getLastMovePlayed();
-    if (this->bookmark->getChild()!= nullptr){
-        this->bookmark = this->bookmark->getChild();
-        cout<<name<<" Bookmark is at "<<this->bookmark->getLocation().getCol()<<this->bookmark->getLocation().getRow()<<" with parent "<<this->bookmark->getParent()->getLocation().getCol()<<this->bookmark->getParent()->getLocation().getRow()<<endl;
-
-        while (location != Utils::convertToGrid(this->bookmark->getLocation().getCol(),
-                                                this->bookmark->getLocation().getRow())) {
-            this->bookmark = this->bookmark->getSibling();
-            //cout<<name<<" Bookmark is at "<<this->bookmark->getLocation().getCol()<<this->bookmark->getLocation().getRow()<<" with parent "<<this->bookmark->getParent()->getLocation().getCol()<<this->bookmark->getParent()->getLocation().getRow()<<endl;
-        }
-
-    }else{
-        cout<<this->name<<" bookmark has no children"<<endl;
+    
+    if (!bookmark->getChild()) {
+        std::cout << "Bookmark has no children." << std::endl;
+        return;
     }
-    cout<<name<<" Bookmark has moved to "<<this->bookmark->getLocation().getCol()<<this->bookmark->getLocation().getRow()<<endl;
+    
+    // Move to child
+    bookmark = bookmark->getChild();
+    
+    // Find the child matching the last move
+    while (bookmark && 
+           lastMove != Utils::convertToGrid(bookmark->getLocation().getCol(),
+                                           bookmark->getLocation().getRow())) {
+        bookmark = bookmark->getSibling();
+    }
+    
+    if (bookmark) {
+        std::cout << "Bookmark moved to ";
+        Utils::printGridLocation(lastMove);
+        std::cout << std::endl;
+    }
 }
 
-GameTreeNode* Agent::analyze() {
-    GameTreeNode *bestMove = this->bookmark->getChild();
-    GameTreeNode *tmp = this->bookmark->getChild();
-    while(tmp!= nullptr) {
-        Evaluate::exploit(tmp);
-        if (tmp->getRank()>bestMove->getRank()){
-            bestMove = tmp;
+std::shared_ptr<GameTreeNode> Agent::analyze() {
+    auto bestMove = bookmark->getChild();
+    auto current = bookmark->getChild();
+    
+    while (current) {
+        Evaluate::exploit(*current);
+        
+        if (current->getRank() > bestMove->getRank()) {
+            bestMove = current;
         }
-        tmp = tmp->getSibling();
+        
+        current = current->getSibling();
     }
-    this->bookmark = bestMove;
+    
+    bookmark = bestMove;
     return bestMove;
 }
 
-void Agent::monteCarloParallel(GameTreeNode *node) {
-    omp_set_num_threads(MAX_SWARM_SIZE);
-    double start = omp_get_wtime();
-#pragma omp parallel
+void Agent::monteCarloParallel(std::shared_ptr<GameTreeNode> node) {
+    const int numThreads = SwarmConfig::getMaxSwarmSize();
+    const int totalDives = SwarmConfig::NUMBER_OF_DIVES;
+    const int divesPerThread = totalDives / numThreads;
+    
+    omp_set_num_threads(numThreads);
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    #pragma omp parallel
     {
         int id = omp_get_thread_num();
-#pragma omp for schedule(dynamic)
-        for (int i = 0; i < NUMBER_OF_DIVES; ++i) {
-            acswarm.at(id).simulate(node);
-            acswarm.at(id).findWinValue();
-            acswarm.at(id).backPropagate(gameTree->getRoot(), this->color);
+        
+        #pragma omp for schedule(dynamic)
+        for (int i = 0; i < totalDives; ++i) {
+            // Use modulo to distribute work among swarms
+            int swarmId = i % numThreads;
+            swarms[swarmId]->simulate(node);
+            swarms[swarmId]->findWinValue();
+            swarms[swarmId]->backPropagate(gameTree->getRoot(), color);
         }
     }
-    double end = omp_get_wtime();
-    cout<<name<<" "<<NUMBER_OF_DIVES<<" dives in parallel ran in "<<end-start<<" seconds with a swarm size of: "<<MAX_SWARM_SIZE<<endl;
-    this->diveTimes.push_back(end-start);
-    //gameTree->printGametree(gameTree->getRoot());
-
-    if (cbswarm.size()>1){
-        cout<<name<< " mutating genetic algorithm"<<endl;
-        short *temp;
-
-        for(int i = 0; i < cbswarm.size()-1;++i) {
-
-            Evaluate::mutate(cbswarm.at(i).getGeneticAlgorithm(), cbswarm.at(i+1).getGeneticAlgorithm());
-            //cbswarm.at(i).setGeneticAlgorithm(temp);
-        }
-        cout<<name<<" done with mutation"<<endl;
-    }
-
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    
+    std::cout << totalDives << " dives completed in " 
+              << elapsed.count() << " seconds with swarm size " 
+              << numThreads << std::endl;
+    
+    diveTimes.push_back(elapsed.count());
 }
 
-void Agent::printTreeToTxt(GameTreeNode *node) {
-    string type;
-    if (!mcswarm.empty()){
-        type = "montecarlo";
-    }else if (!acswarm.empty()){
-        type = "antcolony";
-    }else if (!ffswarm.empty()){
-        type = "firefly";
-    }else if (!cbswarm.empty()){
-        type = "cuckoobird";
+void Agent::printTreeToFile(const std::string& filename) {
+    std::ofstream output(filename);
+    
+    if (!output.is_open()) {
+        std::cerr << "Failed to open " << filename << std::endl;
+        return;
     }
-    cout<<name<<" making " + type<<endl;
-    this->treeCounter = 0;
-    ofstream output;
-    output.open("D:/Chris/csci480/swarmbot/"+type+".js");
-
-    output<< "      google.charts.setOnLoadCallback(drawChart);\n"
-             "      function drawChart() {\n"
-             "      var "+type+"data = google.visualization.arrayToDataTable([\n"
-            "          ['Move', 'Parent', 'Number of simulated wins'],\n"
-            "           ['0-P0',null,0],\n";
-    printTreeToTxtHelper(node->getChild(),1,0, &output);
-
-    output<< "]);\n"
-             "        tree = new google.visualization.TreeMap(document.getElementById('"+type+"_div'));\n"
-             "\n"
-             "        tree.draw("+type+"data, {\n"
-             "          minColor: '#f00',\n"
-             "          midColor: '#ddd',\n"
-             "          maxColor: '#0d0',\n"
-             "          headerHeight: 15,\n"
-             "          fontColor: 'black',\n"
-             "          showScale: true\n"
-             "        });\n"
-             "\n"
-             "      }";
+    
+    treeCounter = 0;
+    
+    // Write Google Charts TreeMap JavaScript
+    output << "google.charts.setOnLoadCallback(drawChart);\n"
+           << "function drawChart() {\n"
+           << "var data = google.visualization.arrayToDataTable([\n"
+           << "  ['Move', 'Parent', 'Win Rate'],\n"
+           << "  ['0-Root', null, 0],\n";
+    
+    printTreeHelper(bookmark->getChild(), 1, 0, output);
+    
+    output << "]);\n"
+           << "var tree = new google.visualization.TreeMap("
+           << "document.getElementById('tree_div'));\n"
+           << "tree.draw(data, {\n"
+           << "  minColor: '#f00',\n"
+           << "  midColor: '#ddd',\n"
+           << "  maxColor: '#0d0',\n"
+           << "  headerHeight: 15,\n"
+           << "  fontColor: 'black',\n"
+           << "  showScale: true\n"
+           << "});\n"
+           << "}\n";
+    
     output.close();
-    cout<<name<<"done"<<endl;
-
+    std::cout << "Tree written to " << filename << std::endl;
 }
 
-
-void Agent::printTreeToTxtHelper(GameTreeNode *node, int level, int parentCount, ofstream *outfile) {
-// a unique id is needed so the google charts api can build the tree. The nature of the gametree has a lot of repetitive data in different spots.
-// The level is still needed so the method can stop in the right spot. There is a treeCounter as a global variable to provide the unique id.
-
-    if (node != nullptr){
-        if (level<10){
-            ++treeCounter; //move the unique id up
-            int temp = treeCounter; //keep the count at that spot so children can point to the right parent.
-            double win = node->getWi();
-            double dive = node->getNi();
-            double percent;
-            dive==0?percent =0: percent = win/dive*100;
-
-            string output = "'"+to_string(treeCounter)+"-"; //unique id for node
-            output += node->getLocation().getCol()+ to_string(node->getLocation().getRow())+"',"; //board location for node
-            output += "'"+to_string(parentCount)+"-"; //unique id from the parent
-            output += node->getParent()->getLocation().getCol()+ to_string(node->getParent()->getLocation().getRow())+"',"; //location of parent node
-            output += to_string(percent)+","; //simulated wins
-            *outfile<<"["+output+"],\n";
-
-            //recurse by sibling first to get all the siblings at the same parent
-            printTreeToTxtHelper(node->getSibling(),level, parentCount,  outfile);
-            //when recursing by child set parentCount to the recorded temp count.
-            printTreeToTxtHelper(node->getChild(),++level, temp,  outfile);
-
-        }
+void Agent::printTreeHelper(std::shared_ptr<GameTreeNode> node,
+                            int level,
+                            int parentCount,
+                            std::ofstream& outfile) {
+    if (!node || level >= 10) return;
+    
+    ++treeCounter;
+    int currentId = treeCounter;
+    
+    int sims = node->getSimulations();
+    int wins = node->getWins();
+    double winRate = (sims > 0) ? (wins * 100.0 / sims) : 0.0;
+    
+    outfile << "  ['" << currentId << "-"
+            << node->getLocation().getCol() << node->getLocation().getRow()
+            << "', '" << parentCount << "-";
+    
+    auto parent = node->getParent();
+    if (parent) {
+        outfile << parent->getLocation().getCol() 
+                << parent->getLocation().getRow();
+    } else {
+        outfile << "Root";
     }
+    
+    outfile << "', " << winRate << "],\n";
+    
+    // Recurse
+    printTreeHelper(node->getSibling(), level, parentCount, outfile);
+    printTreeHelper(node->getChild(), level + 1, currentId, outfile);
 }
 
-void Agent::printAverageTimeToFile() {
-
-    string type;
-    if (!mcswarm.empty()){
-        type = "montecarlo";
-    }else if (!acswarm.empty()){
-        type = "antcolony";
-    }else if (!ffswarm.empty()){
-        type = "firefly";
-    }else if (!cbswarm.empty()){
-        type = "cuckoobird";
+void Agent::printAverageTime() {
+    if (diveTimes.empty()) {
+        std::cout << "No timing data available." << std::endl;
+        return;
     }
-    ofstream output;
-    output.open("D:/Chris/csci480/swarmbot/"+type + to_string(MAX_SWARM_SIZE) + to_string(NUMBER_OF_DIVES) + ".txt");
-
-    output<<accumulate(this->diveTimes.begin(), this->diveTimes.end(),0.0)/this->diveTimes.size();
-
+    
+    double total = std::accumulate(diveTimes.begin(), diveTimes.end(), 0.0);
+    double average = total / diveTimes.size();
+    
+    std::cout << "Average dive time: " << average << " seconds" << std::endl;
 }
 
-
-
+} // namespace Othello

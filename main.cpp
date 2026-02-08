@@ -1,148 +1,65 @@
-#include <iostream>
 #include "includes/OthelloBitBoard.h"
 #include "includes/OthelloGame.h"
 #include "includes/MoveSet.h"
 #include "includes/Player.h"
 #include "includes/Agent.h"
 #include "includes/GameTree.h"
-#include "includes/MonteCarloAgent.h"
-//#include "includes/Utils.h"
+#include <iostream>
+#include <memory>
+
+using namespace Othello;
 
 int main() {
-    //TODO agent segfaults when human error is made.
-    // Wouldn't be a big deal with agent vs agent, but when human plays, it should handle it.
-    //make player first, then the agent. agent won't know its color the other way around.
-    auto *moves = new MoveSet();
-    auto *board = new OthelloBitBoard();
-    auto *gametree = new GameTree(board,moves);
-//    auto *mcAgent = new MonteCarloAgent(gametree);
-    //gameplay
-    auto *game = new OthelloGame(board);
-    auto *player = new Player(game);
-    auto *player2 = new Player(game);
-    auto *agent = new Agent(game,gametree);
-    do{
-        if (game->nextMove()){
-            agent->decide();
-        }
-        if (game->nextMove()){
+    std::cout << "=== Swarmbot Othello ===" << std::endl;
+    std::cout << "An AI powered by swarm intelligence" << std::endl;
+    std::cout << std::endl;
+    
+    // Create game components with smart pointers (no memory leaks!)
+    auto moves = std::make_shared<MoveSet>();
+    auto board = std::make_shared<OthelloBitBoard>();
+    auto gameTree = std::make_shared<GameTree>(board, moves);
+    auto game = std::make_shared<OthelloGame>(board);
+    
+    // Initialize game (ask for player colors)
+    game->initialize();
+    
+    // Create players
+    auto player = std::make_unique<Player>(game);
+    auto agent = std::make_unique<Agent>(game, gameTree);
+    
+    // Game loop
+    std::cout << std::endl;
+    std::cout << "=== Game Start ===" << std::endl;
+    std::cout << std::endl;
+    
+    while (game->nextMove()) {
+        if (game->getCurrentPlayer() == agent->getColor()) {
+            agent->makeMove();
+        } else {
             player->makeMove();
         }
-//        if (game->nextMove()){
-//            player2->makeMove();
-//        }
-    }while(game->nextMove());
-    agent->printTreeToTxt(gametree->getRoot());
-    agent->printAverageTimeToFile();
-    //end of gameplay
-
-
-    //testing for monteCarlo agent
-//    GameTreeNode *testNode = gametree->getRoot();
-//    mcAgent->simulate(testNode);
-//    mcAgent->findWinValue();
-//    mcAgent->backPropagate(testNode,BLACK);
-//    testNode = testNode->getChild();
-//    int wi = testNode->getParent()->getWi();
-//    int ni = testNode->getParent()->getNi();
-//    cout<<"C wi/ni for "<<testNode->getLocation().getCol()<<testNode->getLocation().getRow()<<": "<<wi<<"/"<<ni<<endl;
-//    do {
-//        testNode = testNode->getSibling();
-//        mcAgent->simulate(testNode);
-//        mcAgent->findWinValue();
-//        mcAgent->backPropagate(testNode,BLACK);
-//        wi = testNode->getWi();
-//        ni = testNode->getNi();
-//        cout<<"C wi/ni for "<<testNode->getLocation().getCol()<<testNode->getLocation().getRow()<<": "<<wi<<"/"<<ni<<endl;
-//    } while (testNode->getSibling()!= nullptr);
-//    wi = gametree->getRoot()->getWi();
-//    ni = gametree->getRoot()->getNi();
-//    cout<<"C wi/ni for root: "<<wi<<"/"<<ni<<endl;
-//    if (wi>=ni/2){
-//        cout<<"C simulations favoring agent so far."<<endl;
-//    }else{
-//        cout<<"C simulations favoring opponent so far."<<endl;
-//    }
-
-
-// testing for scanning a node
-//    gametree->scanNode(gametree->getRoot());
-//    gametree->scanNode(gametree->getRoot()->getChild()->getSibling()->getSibling());
-//    gametree->scanNode(gametree->getRoot()->getChild()->getSibling()->getSibling()->getChild());
-//    gametree->printTree(gametree->getRoot(),0);
-// testing for adding children/siblings
-//    auto *gtnode = new GameTreeNode(board);
-//
-//    gtnode->setChild(new GameTreeNode(new OthelloBitBoard(board)),
-//                     gtnode,
-//                     moves->getMove(63-Utils::convertToGrid('d',3)));
-//
-//    gtnode->getChild()->setSibling(new GameTreeNode(new OthelloBitBoard(gtnode->getCurrentBoard())),
-//                                   gtnode->getChild(),
-//                                   moves->getMove(63-Utils::convertToGrid('c',4)));
-//
-//    gtnode->getCurrentBoard()->printBoard();
-//    gtnode->getChild()->getCurrentBoard()->printBoard();
-//    gtnode->getChild()->getSibling()->getCurrentBoard()->printBoard();
-// testing for bitboard
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'e', 6, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'f', 4, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'f', 3, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'f', 2, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'g', 4, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'f', 5, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'e', 2, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'd', 3, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'e', 3, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'h', 4, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'f', 1, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'c', 5, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'g', 5, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'g', 1, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'h', 1, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(WHITE, 'g', 2, false);
-//    board->findLegals(BLACK);
-//    board->printBoardWithLegalMoves();
-//    board->playPiece(BLACK, 'h', 2, false);
-//    board->findLegals(WHITE);
-//    board->printBoardWithLegalMoves();
-
-
-
-
-
-
+    }
+    
+    // Game over
+    std::cout << std::endl;
+    std::cout << "=== Game Over ===" << std::endl;
+    
+    // Print statistics
+    agent->printAverageTime();
+    
+    // Optional: Export game tree
+    std::cout << std::endl;
+    std::cout << "Export game tree? (y/n): ";
+    std::string exportChoice;
+    std::getline(std::cin, exportChoice);
+    
+    if (!exportChoice.empty() && (exportChoice[0] == 'y' || exportChoice[0] == 'Y')) {
+        agent->printTreeToFile("gametree.js");
+        std::cout << "Game tree exported to gametree.js" << std::endl;
+    }
+    
+    std::cout << "Thanks for playing!" << std::endl;
+    
+    // All memory automatically cleaned up by smart pointers!
     return 0;
 }

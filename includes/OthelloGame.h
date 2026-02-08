@@ -2,55 +2,71 @@
 // Created by cblah on 3/4/2022.
 //
 
-#ifndef SWARMBOT_OTHELLOGAME_H
-#define SWARMBOT_OTHELLOGAME_H
+#pragma once
 
 #include "OthelloBitBoard.h"
 #include "Constants.h"
-#include "Utils.h"
-#include <iostream>
+#include <memory>
+#include <string>
 
-using namespace std;
+namespace Othello {
 
+/**
+ * Game controller for Othello
+ * Manages game flow and player turns
+ */
 class OthelloGame {
 public:
-    explicit OthelloGame(OthelloBitBoard *board);
-    short getCurrentPlayer() const;
+    explicit OthelloGame(std::shared_ptr<OthelloBitBoard> board);
+    
+    /**
+     * Initialize game by asking for player colors
+     * Separated from constructor for testability
+     */
+    void initialize();
+    
+    /**
+     * Check if there's a next move available
+     * @return true if game should continue, false if game over
+     */
     bool nextMove();
-    [[nodiscard]] bool isAgentBlack() const;
-    OthelloBitBoard *getBoard() const;
-
-
+    
+    /**
+     * Switch to the other player
+     */
+    void switchPlayer();
+    
+    // ========================================================================
+    // GETTERS
+    // ========================================================================
+    
+    Player getCurrentPlayer() const { return currentPlayer; }
+    bool isAgentBlack() const { return agentBlack; }
+    bool isMoveMade() const { return moveMade; }
+    int16_t getLastMove() const { return lastMovePlayed; }
+    std::shared_ptr<OthelloBitBoard> getBoard() const { return board; }
+    
+    // ========================================================================
+    // SETTERS
+    // ========================================================================
+    
+    void setLastMove(int16_t move) { lastMovePlayed = move; }
+    void setMoveMade(bool made) { moveMade = made; }
+    
+    /**
+     * Interpret user input and make a move
+     * Format: "B c 4" or "W d 3"
+     * @param input The input string
+     * @return true if move was made, false otherwise
+     */
+    bool interpretInput(const std::string& input);
 
 private:
-    string name = "C OthelloGame.cpp";
-    short currentPlayer;
-    OthelloBitBoard *board;
+    Player currentPlayer;
+    std::shared_ptr<OthelloBitBoard> board;
     bool agentBlack;
     bool moveMade;
-public:
-    bool isMoveMade() const;
-
-private:
-    char input;
-    char col;
-    short row;
-    short lastMovePlayed;
-public:
-    void setLastMovePlayed(short lastMovePlayed);
-
-public:
-    short getLastMovePlayed() const;
-    void interpretInput();
-    void switchPlayer();
-
-private:
-    char outputPlayerColor;
-
-
-
-
+    int16_t lastMovePlayed;
 };
 
-
-#endif //SWARMBOT_OTHELLOGAME_H
+} // namespace Othello

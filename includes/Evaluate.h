@@ -2,42 +2,47 @@
 // Created by cblah on 3/4/2022.
 //
 
-#ifndef SWARMBOT_EVALUATE_H
-#define SWARMBOT_EVALUATE_H
+#pragma once
+
 #include "GameTreeNode.h"
-#include "Utils.h"
 #include "Constants.h"
-#include <cmath>
-#include <iostream>
-#include <random>
-#include <ctime>
+#include <cstdint>
 
+namespace Othello {
+namespace Evaluate {
 
-using namespace std;
+/**
+ * Evaluate a node using UCB1 (Upper Confidence Bound) formula
+ * Used for selecting best move in Monte Carlo Tree Search
+ * @param node The node to evaluate
+ */
+void exploit(GameTreeNode& node);
 
-class Evaluate {
-private:
+/**
+ * Mutate genetic algorithm arrays (for evolutionary swarms)
+ * @param one First GA array
+ * @param two Second GA array
+ */
+void mutate(int16_t* one, int16_t* two);
 
-    short board_heuristic[64] = {
-            //   a    b    c    d    e    f    g    h
+/**
+ * Calculate board score for a player using position heuristic
+ * @param board The board to evaluate
+ * @param player The player to evaluate for
+ * @return Score for the player
+ */
+int calculateScore(const OthelloBitBoard& board, Player player);
 
-              100, -64,  20,   10,   10,   20,  -64,  100,
-              -64, -64, -32, -32, -32, -32, -64, -64,
-              20,-32,  10,  10,  10,  10, -32,  20,
-              10,-32,  10, 000, 000,  10, -32,  10,
-              10,-32,  10, 000, 000,  10, -32,  10,
-              20,-32,  10,  10,  10,  10, -32,  20,
-             -64,-64, -32, -32, -32, -32, -64, -64,
-             100,-64,  20,  10,  10,  20, -64, 100,
+/**
+ * Calculate UCB1 value for a node
+ * @param node The node to calculate for
+ * @param parentSimulations Total simulations of parent node
+ * @param explorationConstant Constant for exploration vs exploitation balance
+ * @return UCB1 value
+ */
+double calculateUCB1(const GameTreeNode& node, 
+                     int parentSimulations,
+                     double explorationConstant = 1.41);
 
-    };
-
-public:
-    static void exploit(GameTreeNode *node);
-    static void mutate(short *one, short *two);
-    string name = "C Evaluate.cpp";
-
-};
-
-
-#endif //SWARMBOT_EVALUATE_H
+} // namespace Evaluate
+} // namespace Othello

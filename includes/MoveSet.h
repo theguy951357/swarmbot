@@ -2,25 +2,33 @@
 // Created by cblah on 3/4/2022.
 //
 
-#ifndef SWARMBOT_MOVESET_H
-#define SWARMBOT_MOVESET_H
-#include <map>
+#pragma once
+
 #include "Move.h"
-#include <iostream>
+#include <memory>
+#include <array>
 
-using namespace std;
+namespace Othello {
 
+/**
+ * MoveSet maintains all possible moves on an Othello board
+ * Uses a lookup table for fast access
+ */
 class MoveSet {
 public:
     MoveSet();
-
-    Move* getMove(short location);
+    
+    // Get move by index (0-63)
+    const Move& getMove(int index) const;
+    std::shared_ptr<Move> getMovePtr(int index) const;
+    
+    // Get total number of moves
+    static constexpr int getTotalMoves() { return 64; }
 
 private:
-    string name = "C MoveSet.cpp";
-    map<short, Move> moves;
-
+    void initializeMoves();
+    
+    std::array<std::shared_ptr<Move>, 64> moves;
 };
 
-
-#endif //SWARMBOT_MOVESET_H
+} // namespace Othello

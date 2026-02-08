@@ -4,51 +4,83 @@
 
 
 #include "../../includes/Evaluate.h"
+#include <cmath>
+#include <random>
+#include <algorithm>
 
-default_random_engine mteval(time(nullptr));
-/**
- * this exploit algorithm is taken from
- * Chang, Hyeong Soo; Fu, Michael C.; Hu, Jiaqiao; Marcus, Steven I. (2005).
- * "An Adaptive Sampling Algorithm for Solving Markov Decision Processes"
- * (PDF). Operations Research. 53: 126–139. doi:10.1287/opre.1040.0145. hdl:1903/6264.
- * on wikipedia.
- *
- * @param node
- */
+namespace Othello {
+namespace Evaluate {
 
-void Evaluate::exploit(GameTreeNode *node) {
-    double wi = node->getWi();
-    double ni = node->getNi();
-    double Ni = node->getParent()->getNi();
-    int b = BOARD_HEURISTIC[Utils::convertToGrid(node->getLocation().getCol(),node->getLocation().getRow())];
-    double c = sqrt(2);
-    double result = (wi/ni)+(c * sqrt(log(Ni)/ni))+(b/ni);
-    node->setRank(result);
-}
-/**
- * this mutate algorithm will take two Genetic algorithms as parameters,
- * go through the moveset in the array,
- * and randomly pick out one to succeed for the next algorithm.
- * @param one
- * @param two
- * @return
- */
-void Evaluate::mutate(short *one, short *two) {
-    short *higher;
-    short *lower;
-    if(one[30]>=two[30]){
-        two[30]=one[30];
-        higher=one;
-        lower=two;
-    }else{
-        one[30]=two[30];
-        higher=two;
-        lower=one;
+// Thread-local random number generator
+thread_local std::mt19937 rng(std::random_device{}());
+
+void exploit(GameTreeNode& node) {
+    int simulations = node.getSimulations();
+    
+    if (simulations == 0) {
+        node.setRank(0.0);
+        return;
     }
-    uniform_int_distribution<int> dist(0,RAND_MAX);
-    for (int i = 0; i < 30; ++i) {
-        double rando = (double )dist(mteval)/RAND_MAX+higher[30]/64;
-        rando>.5?lower[i]=higher[i]:higher[i]=lower[i];
+    
+    int wins = node.getWins();
+    double winRate = static_cast<double>(wins) / simulations;
+    
+    // Get parent simulations for UCB1 calculation
+    auto parent = node.getParent();
+    int parentSimulations = parent ? parent->getSimulations() : 1;
+    
+    // Calculate UCB1 value
+    double rank = calculateUCB1(node, parentSimulations);
+    node.setRank(rank);
+}
+
+void mutate(int16_t* one, int16_t* two) {
+    if (!one || !two) return;
+    
+    std::uniform_int_distribution<int> dist(0, 31);
+    int swapPoint = dist(rng);
+    
+    // Swap genetic material at the crossover point
+    for (int i = swapPoint; i < 32; ++i) {
+        std::swap(one[i], two[i]);
     }
 }
 
+int calculateScore(const OthelloBitBoard& board, Player player) {
+    int score = 0;
+    
+    uint64_t playerBoard = (player == Player::BLACK) ? 
+                           board.getBoardBlackPlayer() : 
+                           board.getBoardWhitePlayer();
+    
+    // Use bit manipulation to iterate through pieces
+    while (playerBoard != 0) {
+        int pos = __builtin_ctzll(playerBoard);
+        score += Heuristic::BOARD_VALUES[pos];
+        playerBoard &= playerBoard - 1;  // Clear lowest bit
+    }
+    
+    return score;
+}
+
+double calculateUCB1(const GameTreeNode& node,
+                     int parentSimulations,
+                     double explorationConstant) {
+    int simulations = node.getSimulations();
+    
+    if (simulations == 0) {
+        return std::numeric_limits<double>::infinity();
+    }
+    
+    int wins = node.getWins();
+    double winRate = static_cast<double>(wins) / simulations;
+    
+    // UCB1 formula: winRate + c * sqrt(ln(parentSims) / sims)
+    double exploration = explorationConstant * 
+                        std::sqrt(std::log(parentSimulations) / simulations);
+    
+    return winRate + exploration;
+}
+
+} // namespace Evaluate
+} // namespace Othello

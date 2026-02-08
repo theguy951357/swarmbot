@@ -1,0 +1,54 @@
+cmake_minimum_required(VERSION 3.15)
+project(SwarmBot VERSION 2.0.0 LANGUAGES CXX)
+
+# Set C++17 standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Find OpenMP
+find_package(OpenMP REQUIRED)
+
+# Compiler optimizations
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -flto -funroll-loops")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -Wpedantic")
+endif()
+
+# Source files
+set(SOURCES
+    main.cpp
+    src/BitBoard/OthelloBitBoard.cpp
+    src/Game/OthelloGame.cpp
+    src/GameTree/GameTree.cpp
+    src/GameTree/GameTreeNode.cpp
+    src/Moving/Move.cpp
+    src/Moving/MoveSet.cpp
+    src/Players/Player.cpp
+    src/Players/Agent.cpp
+    src/Swarm/SwarmAgent.cpp
+    src/Swarm/MonteCarloAgent.cpp
+    src/Swarm/AntColonySwarm.cpp
+    src/Swarm/OtherSwarms.cpp
+    src/Utils/Utils.cpp
+    src/Utils/Evaluate.cpp
+)
+
+# Include directories
+include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/includes)
+
+# Create executable
+add_executable(swarmbot ${SOURCES})
+
+# Link OpenMP
+target_link_libraries(swarmbot PRIVATE OpenMP::OpenMP_CXX)
+
+# Installation
+install(TARGETS swarmbot DESTINATION bin)
+
+# Print configuration
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "OpenMP found: ${OpenMP_CXX_FOUND}")

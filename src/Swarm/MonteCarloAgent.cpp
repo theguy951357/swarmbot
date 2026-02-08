@@ -2,149 +2,77 @@
 // Created by cblah on 3/4/2022.
 //
 
-#include "../../includes/MonteCarloAgent.h"
-default_random_engine mt(time(nullptr));
-//default_random_engine mt(100);
+#include "../includes/MonteCarloAgent.h"
+#include <random>
+#include <algorithm>
 
-/**
- * This MonteCarlo agent will be the parent class for all the swarm agents.
- * The Agent() class will send down N number of swarm agents that will
- * inherit the MonteCarloAgent as they will all dive in the same fashion.
- * This class should be able to function on its own as a regular MCTS.
- *
- * The constructor is going to take in the GameTree being acted on.
- * It will also set the current node to nullptr and the winvalue to 0.
- *
- */
+namespace Othello {
 
+// Thread-local random number generator for better performance
+thread_local std::mt19937 rng(std::random_device{}());
 
-MonteCarloAgent::MonteCarloAgent(GameTree *gameTree) : gameTree(gameTree) {
-    this->currentNode = nullptr;
-    this->winValue = 0;
-
-    //TODO try setting the other swarms out of the MonteCarloAgent's inheritance so they are not children.
-    // this may be causing the bug.
-
+MonteCarloAgent::MonteCarloAgent(std::shared_ptr<GameTree> gameTree)
+    : SwarmAgent(gameTree) {
+    geneticAlgorithm.fill(0);
 }
-/**
- * This method will simulate a game on the gameTree.
- * It will choose moves at random down to a leaf node
- * or end of game.
- * @param node
- */
-void MonteCarloAgent::simulate(GameTreeNode *node) {
-    //cout<<name<<" simulating"<<endl;
-    if (node == nullptr){
-        return;
-    }
-    while (node->isLock()){
-        //cout<<name<<"in lock loop"<<endl;
-    }
-#pragma omp critical
-    {
-        node->setLock(true);
-    }
-    this->currentNode = node;
-    if (currentNode->getState() == NOT_SCANNED) {
-        currentNode->setState(SCANNING);
-        gameTree->scanNode(currentNode);
-    }else if (omp_in_parallel() && currentNode->getState() == SCANNING) {
-        currentNode = currentNode->getParent();
-    }
 
-    uniform_int_distribution<int> dist(0,RAND_MAX);
-    double rando = (double )dist(mt)/RAND_MAX;
-    if (currentNode->getChild()!= nullptr){
-        currentNode = currentNode->getChild();
-    }else{
-        node->setLock(false);
+void MonteCarloAgent::simulate(std::shared_ptr<GameTreeNode> node) {
+    if (!node) return;
+    
+    // Try to acquire lock on the node
+    std::unique_lock<std::mutex> lock(node->getMutex(), std::try_to_lock);
+    if (!lock.owns_lock()) {
+        // Node is busy, skip it
         return;
     }
-    while(currentNode->getSibling() != nullptr){
-        if (rando < .5f){
-            if (currentNode->getSibling()!= nullptr){
-                currentNode=currentNode->getSibling();
-            }else{
-                currentNode = node->getChild();
-            }
-        }else{
-            break;
+    
+    currentNode = node;
+    
+    // Atomically check and update state
+    ScanState expected = ScanState::NOT_SCANNED;
+    if (currentNode->getState() == expected) {
+        if (currentNode->compareAndSwapState(expected, ScanState::SCANNING)) {
+            gameTree->scanNode(currentNode);
+        } else {
+            // Another thread is scanning, move to parent
+            currentNode = currentNode->getParent();
+            if (!currentNode) return;
         }
     }
-    node->setLock(false);
+    
+    // Check if we're at a leaf node
+    if (!currentNode->getChild()) {
+        return;
+    }
+    
+    // Random move selection
+    currentNode = currentNode->getChild();
+    
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
+    
+    // Randomly traverse siblings
+    while (currentNode->getSibling() && dist(rng) < 0.5) {
+        currentNode = currentNode->getSibling();
+    }
+    
+    // Recursively simulate from selected child
+    // Release lock before recursion
+    lock.unlock();
     simulate(currentNode);
 }
-/**
- * This method will evaluate the leaf node and determine who the winner is.
- */
-void MonteCarloAgent::findWinValue() {
-    //cout<<"C finding the winner."<<endl;
-    short blackCount = 0;
-    short whiteCount = 0;
-    uint_fast64_t blackBoard = currentNode->getCurrentBoard()->getBoardBlackPlayer();
-    uint_fast64_t whiteBoard = currentNode->getCurrentBoard()->getBoardWhitePlayer();
-    for (int i = 7; i >= 0; --i) {
-        for (int j = 7; j >= 0; --j) {
-            uint_fast64_t location = 1ULL <<(8*i+j);
-            if (blackBoard & location) {
-                ++blackCount;
-            }else if (whiteBoard & location){
-                ++whiteCount;
-            }
-        }
-    }
-    blackCount > whiteCount ? winValue=BLACK : winValue=WHITE;
-//    cout<<"C black/white count: "<<blackCount<<"/"<<whiteCount<<". ";
-//    Utils::printPlayerColor(winValue);
-//    cout<<"wins the simulation!"<<endl;
-}
-/**
- * The backPropagate function will send the MonteCarloAgent back up the tree to the root.
- * All the parent nodes in the path will have their wi and ni updated as the agent passes
- * that node.
- * @param node
- * @param playerColor
- */
-void MonteCarloAgent::backPropagate(GameTreeNode *node, short playerColor) {
-    //cout<<"C back propagating."<<endl;
-    short wiAdd = 0;
-    if (winValue==playerColor){
-        wiAdd = 1;
-    }
-    if (currentNode->getNi()!=1){//if node hasn't been checked yet.
-        while(currentNode != nullptr){
-            currentNode->setNi(currentNode->getNi()+1);
-            currentNode->setWi(currentNode->getWi()+wiAdd);
-            currentNode = currentNode->getParent();
-        }
-    }
+
+void MonteCarloAgent::setGeneticAlgorithm(int16_t* ga) {
+    if (!ga) return;
+    std::copy(ga, ga + 32, geneticAlgorithm.begin());
 }
 
-short *MonteCarloAgent::getGeneticAlgorithm() const {
-    return geneticAlgorithm;
-}
-
-void MonteCarloAgent::setGeneticAlgorithm(short *geneticAlgorithm) {
-    MonteCarloAgent::geneticAlgorithm = geneticAlgorithm;
-}
-
-void MonteCarloAgent::makeNewGa() {
-    //cout<<name<< " debug GA creation"<<endl;
+void MonteCarloAgent::makeNewGA() {
+    std::uniform_int_distribution<int> dist(0, 64);
+    
     for (int i = 0; i < 31; ++i) {
-
-        uniform_int_distribution<int> dist(0,RAND_MAX);
-        geneticAlgorithm[i] = dist(mt)%65;
+        geneticAlgorithm[i] = dist(rng);
     }
-    geneticAlgorithm[31]=0;
-    //cout<<name<< " debug GA creation done"<<endl;
-
+    geneticAlgorithm[31] = 0;
 }
 
-
-
-
-
-
-
-
-
+} // namespace Othello

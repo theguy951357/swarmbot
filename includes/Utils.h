@@ -2,32 +2,48 @@
 // Created by cblah on 3/4/2022.
 //
 
-#ifndef SWARMBOT_UTILS_H
-#define SWARMBOT_UTILS_H
+#pragma once
 
-#include <iostream>
 #include "Constants.h"
+#include <cstdint>
+#include <iostream>
 
+namespace Othello {
+namespace Utils {
 
+/**
+ * Convert column letter and row number to grid position (0-63)
+ * @param col Column letter ('a'-'h' or 'A'-'H')
+ * @param row Row number (1-8)
+ * @return Grid position (0-63)
+ */
+int16_t convertToGrid(char col, int16_t row);
 
-using namespace std;
+/**
+ * Print grid location in human-readable format (e.g., "e4")
+ * @param location Grid position (0-63)
+ */
+void printGridLocation(int16_t location);
 
-class Utils {
-private:
-    string name = "C Utils.cpp";
+/**
+ * Print player color to console
+ * @param player The player color
+ */
+void printPlayerColor(Player player);
 
+/**
+ * Convert grid position to column letter
+ * @param location Grid position (0-63)
+ * @return Column letter ('a'-'h')
+ */
+char gridToColumn(int16_t location);
 
-public:
-    static short convertToGrid(short col, short row);
-    
-    static void printGridLocation(short location);
+/**
+ * Convert grid position to row number
+ * @param location Grid position (0-63)
+ * @return Row number (1-8)
+ */
+int16_t gridToRow(int16_t location);
 
-    static void printPlayerColor(short color);
-
-
-
-
-};
-
-
-#endif //SWARMBOT_UTILS_H
+} // namespace Utils
+} // namespace Othello

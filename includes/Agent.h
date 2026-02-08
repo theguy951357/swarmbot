@@ -2,52 +2,84 @@
 // Created by cblah on 3/4/2022.
 //
 
-#ifndef SWARMBOT_AGENT_H
-#define SWARMBOT_AGENT_H
-
+##pragma once
 
 #include "Player.h"
 #include "GameTree.h"
-#include "GameTreeNode.h"
-#include "MonteCarloAgent.h"
-#include "AntColonySwarm.h"
-#include "FireflySwarm.h"
-#include "CuckooBirdSwarm.h"
-#include "Evaluate.h"
-#include "Constants.h"
-
-#include <omp.h>
-#include <iostream>
-#include <fstream>
+#include "SwarmAgent.h"
+#include <memory>
 #include <vector>
-#include <unistd.h>
-#include <numeric>
+#include <chrono>
+#include <string>
 
-class Agent : public Player{
+namespace Othello {
+
+/**
+ * AI Agent that uses swarm intelligence algorithms
+ */
+class Agent : public Player {
 public:
-    Agent(OthelloGame *game, GameTree *gameTree);
+    Agent(std::shared_ptr<OthelloGame> game, 
+          std::shared_ptr<GameTree> gameTree);
+    
+    /**
+     * Override makeMove to use AI decision making
+     */
+    void makeMove() override;
+    
+    /**
+     * Main AI decision-making function
+     */
     void decide();
-    void printTreeToTxt(GameTreeNode *node);
-    void printAverageTimeToFile();
+    
+    /**
+     * Print game tree to file for analysis
+     * @param filename Output filename
+     */
+    void printTreeToFile(const std::string& filename);
+    
+    /**
+     * Print average computation time
+     */
+    void printAverageTime();
 
 private:
-    string name = "C Agent.cpp";
-    vector<double> diveTimes;
-    int treeCounter;
-    GameTree *gameTree;
-    //MonteCarloAgent *monteCarloAgent;
-    vector<MonteCarloAgent> mcswarm;
-    vector<AntColonySwarm> acswarm;
-    vector<FireflySwarm> ffswarm;
-    vector<CuckooBirdSwarm> cbswarm;
-    GameTreeNode *bookmark;
-    void agentAddToStrategy();
+    std::shared_ptr<GameTree> gameTree;
+    std::vector<std::unique_ptr<SwarmAgent>> swarms;
+    std::vector<double> diveTimes;
+    std::shared_ptr<GameTreeNode> bookmark;
+    
+    /**
+     * Initialize swarm agents
+     */
+    void initializeSwarms();
+    
+    /**
+     * Move bookmark to opponent's last move
+     */
     void moveBookmark();
-    GameTreeNode *analyze();
-    void monteCarloParallel(GameTreeNode *node);
-    void printTreeToTxtHelper(GameTreeNode *node, int level, int parentCount, ofstream *outfile);
-
+    
+    /**
+     * Analyze children and select best move
+     * @return Best child node
+     */
+    std::shared_ptr<GameTreeNode> analyze();
+    
+    /**
+     * Run parallel Monte Carlo simulations
+     * @param node Node to simulate from
+     */
+    void monteCarloParallel(std::shared_ptr<GameTreeNode> node);
+    
+    /**
+     * Helper for tree printing
+     */
+    void printTreeHelper(std::shared_ptr<GameTreeNode> node,
+                        int level,
+                        int parentCount,
+                        std::ofstream& outfile);
+    
+    int treeCounter;
 };
 
-
-#endif //SWARMBOT_AGENT_H
+} // namespace Othello

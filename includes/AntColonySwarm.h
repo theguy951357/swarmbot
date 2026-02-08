@@ -2,39 +2,26 @@
 // Created by cblah on 4/14/2022.
 //
 
-#ifndef SWARMBOT_ANTCOLONYSWARM_H
-#define SWARMBOT_ANTCOLONYSWARM_H
+#pragma once
 
-#include <iostream>
-#include <omp.h>
-#include "GameTree.h"
-#include "Evaluate.h"
-#include "Constants.h"
-#include "Utils.h"
-#include <random>
-#include <ctime>
-#include <omp.h>
+#include "MonteCarloAgent.h"
 
+namespace Othello {
 
-using namespace std;
-
-
-
-class AntColonySwarm{
-
+/**
+ * Ant Colony Optimization variant of Monte Carlo agent
+ * Uses pheromone-like trail reinforcement
+ */
+class AntColonySwarm : public MonteCarloAgent {
 public:
-    AntColonySwarm(GameTree *gameTree);
-    void simulate(GameTreeNode *node);
-    void findWinValue();
-    void backPropagate(GameTreeNode *node, short playerColor);
+    explicit AntColonySwarm(std::shared_ptr<GameTree> gameTree);
+    
+    void simulate(std::shared_ptr<GameTreeNode> node) override;
+    std::string getName() const override { return "Ant Colony"; }
+
 private:
-
-    string name = "C AntColonySwarm.cpp";
-    GameTree *gameTree;
-    GameTreeNode *currentNode;
-    short winValue;
-
+    double pheromoneDecay = 0.9;
+    double pheromoneInfluence = 1.0;
 };
 
-
-#endif //SWARMBOT_ANTCOLONYSWARM_H
+} // namespace Othello
