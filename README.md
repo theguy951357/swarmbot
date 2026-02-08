@@ -2,7 +2,24 @@
 
 A completely refactored version of the SwarmBot Othello AI with modern C++ practices, optimized performance, and proper memory management.
 
-## 🚀 Key Improvements
+## 🚀 Quick Start by Platform
+
+Choose your operating system:
+
+- **🍎 macOS (M2/M3/Intel)**: See [MAC_M2_SETUP.md](MAC_M2_SETUP.md)
+- **🐧 Linux (Ubuntu/Fedora/Arch)**: See [LINUX_SETUP.md](LINUX_SETUP.md)
+- **🪟 Windows (10/11)**: See [WINDOWS_SETUP.md](WINDOWS_SETUP.md)
+- **💻 VS Code Setup**: See [VSCODE_SETUP.md](VSCODE_SETUP.md)
+
+## 📚 Documentation
+
+- **README.md** - This file (overview)
+- **IMPROVEMENTS.md** - Complete list of 50+ improvements
+- **MIGRATION_GUIDE.md** - Migrate from original to refactored
+- **SWARM_ALGORITHMS.md** - How each swarm algorithm works
+- **Platform-specific guides** - Detailed setup for your OS
+
+## 🎯 Key Improvements
 
 ### Performance Enhancements (10-20x faster)
 - **Bit manipulation optimization**: Uses `__builtin_ctzll` and `__builtin_popcountll` for 50-100x faster piece counting
@@ -45,7 +62,7 @@ A completely refactored version of the SwarmBot Othello AI with modern C++ pract
 - CMake 3.15+
 - OpenMP support
 
-### Compilation
+### Quick Build (All Platforms)
 
 ```bash
 # Create build directory
@@ -55,17 +72,14 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 
 # Build
-cmake --build . -j$(nproc)
+cmake --build . -j$(nproc)  # Linux/Mac
+cmake --build . -j8          # Windows (adjust number)
 
 # Run
 ./swarmbot
 ```
 
-### Compiler Flags Explained
-- `-O3`: Maximum optimization
-- `-march=native`: Use CPU-specific instructions (AVX, SSE, etc.)
-- `-flto`: Link-time optimization
-- `-funroll-loops`: Unroll small loops
+**Platform-specific instructions**: See the setup guide for your OS above.
 
 ## 🎮 Usage
 
@@ -247,10 +261,18 @@ This is a refactored version of a college senior project on swarm intelligence i
 - Firefly Algorithm
 - Cuckoo Search
 
+## 🤝 Contributing
+
+Feel free to fork and improve! Areas of interest:
+- Additional swarm algorithms
+- Better evaluation functions
+- GUI interface
+- Network play
+
 ## 📄 License
 
 Same license as original project.
 
 ## 🙏 Acknowledgments
 
-Original project by Christopher Blaha. Refactored for modern C++ practices, performance, and maintainability.
+Original project by theguy951357. Refactored for modern C++ practices, performance, and maintainability.
