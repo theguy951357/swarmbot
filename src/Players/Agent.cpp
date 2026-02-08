@@ -5,6 +5,7 @@
 
 #include "../includes/Agent.h"
 #include "../includes/AntColonySwarm.h"
+#include "../includes/OtherSwarms.h"
 #include "../includes/Evaluate.h"
 #include "../includes/Utils.h"
 #include <omp.h>
@@ -39,10 +40,40 @@ void Agent::initializeSwarms() {
     int swarmSize = SwarmConfig::getMaxSwarmSize();
     swarms.reserve(swarmSize);
     
-    // Create swarm agents (using AntColonySwarm as default)
+    // By default, use Ant Colony swarm
+    // You can easily change this to use different swarm types:
+    // - MonteCarloAgent (standard MCTS)
+    // - AntColonySwarm (pheromone-based)
+    // - FireflySwarm (light intensity-based)
+    // - CuckooBirdSwarm (Lévy flight-based)
+    
+    // Option 1: Use all one type
     for (int i = 0; i < swarmSize; ++i) {
         swarms.push_back(std::make_unique<AntColonySwarm>(gameTree));
     }
+    
+    // Option 2: Mix different swarm types (uncomment to use)
+    /*
+    int perType = swarmSize / 4;
+    for (int i = 0; i < perType; ++i) {
+        swarms.push_back(std::make_unique<MonteCarloAgent>(gameTree));
+    }
+    for (int i = 0; i < perType; ++i) {
+        swarms.push_back(std::make_unique<AntColonySwarm>(gameTree));
+    }
+    for (int i = 0; i < perType; ++i) {
+        swarms.push_back(std::make_unique<FireflySwarm>(gameTree));
+    }
+    for (int i = 0; i < perType; ++i) {
+        swarms.push_back(std::make_unique<CuckooBirdSwarm>(gameTree));
+    }
+    */
+    
+    std::cout << "Initialized " << swarms.size() << " swarm agents: ";
+    if (!swarms.empty()) {
+        std::cout << swarms[0]->getName();
+    }
+    std::cout << std::endl;
 }
 
 void Agent::makeMove() {
