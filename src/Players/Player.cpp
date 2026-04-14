@@ -2,8 +2,8 @@
 // Created by cblah on 3/4/2022.
 //
 
-#include "../includes/Player.h"
-#include "../includes/Utils.h"
+#include "../../includes/Player.h"
+#include "../../includes/Utils.h"
 #include <iostream>
 
 namespace Othello {
